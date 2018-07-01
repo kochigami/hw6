@@ -4,6 +4,7 @@
 import webapp2
 from google.appengine.api import urlfetch
 import json, codecs
+from find_route import FindRoute
 
 class MainPage(webapp2.RequestHandler):
     def get(self):
@@ -84,42 +85,25 @@ class TrainTransit(webapp2.RequestHandler):
 
             for i in range(line_num):
                 for j in range(station_num[i]):
-                    current_station = train_route[i]['Stations'][j]
+                    current_station = train_route[i]['Stations'][j] + "-" + train_route[i]['Name']
                     prev_station = None
                     next_station = None
+                    route.append([current_station])
+                    current_pos = len(route) - 1
                     if j > 0:
-                        prev_station = train_route[i]['Stations'][j-1]
+                        prev_station = train_route[i]['Stations'][j-1] + "-" + train_route[i]['Name']
+                        route[current_pos].append(prev_station)
                     if j < station_num[i] -1:
-                        next_station = train_route[i]['Stations'][j+1]
-                    new_station = True
-                    for k in range(len(route)):
-                        if route[k][0] == current_station:
-                            new_station = False
-                            if prev_station is not None:
-                                flag = True
-                                for s in range(1, len(route[k])):
-                                    if prev_station == route[k][s]:
-                                        flag = False
-                                        break
-                                if flag:
-                                    route[k].append(prev_station)
-                            if next_station is not None:
-                                flag = True
-                                for s in range(1, len(route[k])):
-                                    if next_station == route[k][s]:
-                                        flag = False
-                                        break
-                                if flag:
-                                    route[k].append(next_station)
-                            break
+                        next_station = train_route[i]['Stations'][j+1] + "-" + train_route[i]['Name']
+                        route[current_pos].append(next_station)
+
+                for i in range(len(route)):
+                    for j in range(len(route)):
+                        str1 = route[i][0].split("-")
+                        str2 = route[j][0].split("-")
+                        if i != j and str1[0] == str2[0]:
+                            route[i].append(route[j][0])
                         
-                    if new_station:
-                        m = len(route)
-                        route.append([current_station])
-                        if prev_station is not None:
-                            route[m].append(prev_station)
-                        if next_station is not None:
-                            route[m].append(next_station)
             return route
     
     def train_option(self, url):
@@ -137,14 +121,15 @@ class TrainTransit(webapp2.RequestHandler):
 
                 for j in range(station_num[i]):
                     current_station = train_route[i]['Stations'][j]
-                    tag += "<option value=" + current_station + ">" + current_station + "</option>"
+                    current_station_with_line = current_station + "-" + train_route[i]['Name']
+                    tag += "<option value=" + current_station_with_line + ">" + current_station + "</option>"
                 tag += "</optgroup>"
         return tag
 
     def post(self):
         utils = Utils()
         url = "http://fantasy-transit.appspot.com/net?format=json"
-        self.read_route(url)
+        route = self.read_route(url)
 
         self.response.headers['Content-Type'] = 'text/html; charset=UTF-8'
         
@@ -167,7 +152,7 @@ class TrainTransit(webapp2.RequestHandler):
             """
             </select>
             <br>
-            <input type=submit>
+            <input type=submit value="Search">
             </form>
             """
         )
@@ -176,9 +161,14 @@ class TrainTransit(webapp2.RequestHandler):
         end = self.request.get('end')
         if utils.check_input(start, end):
             self.response.write(start + " => " + end)
+            self.response.write("<br>")
+            self.response.write("<br>")
+            find_route = FindRoute()
+            path = find_route.search(route, start, end)
+            for i in range(len(path)):
+                self.response.write(path[i])
+                self.response.write("<br>")
         
-        # FIXME: find route
-
         self.response.write(utils.back_to_menu())
 
 app = webapp2.WSGIApplication([
