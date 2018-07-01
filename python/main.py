@@ -8,7 +8,18 @@ class MainPage(webapp2.RequestHandler):
         self.response.headers['Content-Type'] = 'text/html; charset=UTF-8'
         self.response.write(
             """
-            <form action="result" method="post">
+            <form action="shuffle_words" method="post">
+            <input type="submit" value="Shuffle Words">
+            </form>
+            """
+            )
+
+class ShuffleWords(webapp2.RequestHandler):
+    def post(self):
+        self.response.headers['Content-Type'] = 'text/html; charset=UTF-8'
+        self.response.write(
+            """
+            <form action="shuffle_words" method="post">
             <input type=text placeholder="１番目の単語を入力してね" name=q1>
             <br>
             <input type=text placeholder="２番目の単語を入力してね" name=q2>
@@ -17,38 +28,19 @@ class MainPage(webapp2.RequestHandler):
             </form>
             """
             )
-
-class Result(webapp2.RequestHandler):
-    def post(self):
         q1 = self.request.get('q1')
         q2 = self.request.get('q2')
         if self.check_input(q1, q2):
             q3 = self.mix_query(q1, q2)
-            self.response.write(q3)
-            self.response.write(
-                """
-                <form action="result" method="post">
-                <input type=text placeholder="１番目の単語を入力してね" name=q1>
-                <br>
-                <input type=text placeholder="２番目の単語を入力してね" name=q2>
-                <br>
-                <input type=submit>
-                </form>
-                """
+            self.response.write("=> " + q3)
+        self.response.write(
+            """
+            <form action="/" method="get">
+            <input type="submit" value="Back to Menu">
+            </form>
+            """
             )
 
-        else:
-            self.response.write(
-                """
-                <form action="result" method="post">
-                <input type=text placeholder="１番目の単語を入力してね" name=q1>
-                <br>
-                <input type=text placeholder="２番目の単語を入力してね" name=q2>
-                <br>
-                <input type=submit>
-                </form>
-                """
-            )
 
     def mix_query(self, q1, q2):
         i = 0
@@ -73,5 +65,5 @@ class Result(webapp2.RequestHandler):
 
 app = webapp2.WSGIApplication([
     ('/', MainPage),
-    ('/result', Result),
+    ('/shuffle_words', ShuffleWords),
 ], debug=True)
