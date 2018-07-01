@@ -11,6 +11,9 @@ class MainPage(webapp2.RequestHandler):
             <form action="shuffle_words" method="post">
             <input type="submit" value="Shuffle Words">
             </form>
+            <form action="train_transit" method="post">
+            <input type="submit" value="Train Transit">
+            </form>
             """
             )
 
@@ -63,7 +66,20 @@ class ShuffleWords(webapp2.RequestHandler):
         else:
             return False
 
+class TrainTransit(webapp2.RequestHandler):
+    def post(self):
+        self.response.headers['Content-Type'] = 'text/html; charset=UTF-8'
+        self.response.write("train trainsit")
+        self.response.write(
+            """
+            <form action="/" method="get">
+            <input type="submit" value="Back to Menu">
+            </form>
+            """
+            )
+
 app = webapp2.WSGIApplication([
     ('/', MainPage),
     ('/shuffle_words', ShuffleWords),
+    ('/train_transit', TrainTransit)
 ], debug=True)
