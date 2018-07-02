@@ -2,6 +2,9 @@
 # -*- coding: utf-8 -*-
 
 import webapp2
+from google.appengine.api import urlfetch
+import json, codecs
+from find_route import FindRoute
 
 class MainPage(webapp2.RequestHandler):
     def get(self):
@@ -11,18 +14,37 @@ class MainPage(webapp2.RequestHandler):
             <form action="shuffle_words" method="post">
             <input type="submit" value="Shuffle Words">
             </form>
+            <form action="train_transit" method="post">
+            <input type="submit" value="Train Transit">
+            </form>
             """
             )
 
+class Utils():    
+    def check_input(self, q1, q2):
+        if len(q1) > 0 and len(q2) > 0:
+            return True
+        else:
+            return False
+
+    def back_to_menu(self):
+        back_to_menu="""
+        <form action="/" method="get">
+        <input type="submit" value="Back to Menu">
+        </form>
+        """
+        return back_to_menu
+
 class ShuffleWords(webapp2.RequestHandler):
     def post(self):
+        utils = Utils()
         self.response.headers['Content-Type'] = 'text/html; charset=UTF-8'
         self.response.write(
             """
             <form action="shuffle_words" method="post">
-            <input type=text placeholder="１番目の単語を入力してね" name=q1>
+            <input type=text placeholder="１つ目の単語を入力してね" name=q1>
             <br>
-            <input type=text placeholder="２番目の単語を入力してね" name=q2>
+            <input type=text placeholder="２つ目の単語を入力してね" name=q2>
             <br>
             <input type=submit>
             </form>
@@ -30,17 +52,10 @@ class ShuffleWords(webapp2.RequestHandler):
             )
         q1 = self.request.get('q1')
         q2 = self.request.get('q2')
-        if self.check_input(q1, q2):
+        if utils.check_input(q1, q2):
             q3 = self.mix_query(q1, q2)
             self.response.write("=> " + q3)
-        self.response.write(
-            """
-            <form action="/" method="get">
-            <input type="submit" value="Back to Menu">
-            </form>
-            """
-            )
-
+        self.response.write(utils.back_to_menu())
 
     def mix_query(self, q1, q2):
         i = 0
@@ -57,13 +72,119 @@ class ShuffleWords(webapp2.RequestHandler):
                 string += q2[j]
         return string
 
-    def check_input(self, q1, q2):
-        if len(q1) > 0 and len(q2) > 0:
-            return True
-        else:
-            return False
+class TrainTransit(webapp2.RequestHandler):
+    def read_route(self, url):
+        route = []
+        station = {}
+        response = urlfetch.fetch(url)
+        if response.status_code == 200:
+            train_route = json.loads(response.content)
+            line_num = len(train_route)
+            station_num = []
+            for i in range(line_num):
+                station_num.append(len(train_route[i]['Stations']))
+
+            for i in range(line_num):
+                for j in range(station_num[i]):
+                    current_station = train_route[i]['Stations'][j] + "-" + train_route[i]['Name']
+                    prev_station = None
+                    next_station = None
+                    route.append([current_station])
+                    current_pos = len(route) - 1
+                    station[current_station] = current_pos
+                    if j > 0:
+                        prev_station = train_route[i]['Stations'][j-1] + "-" + train_route[i]['Name']
+                        route[current_pos].append(prev_station)
+                    if j < station_num[i] -1:
+                        next_station = train_route[i]['Stations'][j+1] + "-" + train_route[i]['Name']
+                        route[current_pos].append(next_station)
+
+            for i in range(len(route)):
+                for j in range(len(route)):
+                    str1 = route[i][0].split("-")
+                    str2 = route[j][0].split("-")
+                    if  str1[0] == str2[0] and route[i][0] != route[j][0]:
+                        route[i].append(route[j][0])
+            ###
+            # for i in range(len(route)):
+            #     self.response.write("---" + route[i][0] + "---")
+            #     self.response.write("<br>")
+            #     self.response.write("<br>")
+
+            #     for j in range(1,len(route[i])):
+            #         print self.response.write(route[i][j])
+            #         self.response.write("<br>")
+            #     self.response.write("<br>")
+
+        return station, route
+    
+    def train_option(self, url):
+        response = urlfetch.fetch(url)
+        if response.status_code == 200:
+            train_route = json.loads(response.content)
+            line_num = len(train_route)
+            station_num = []
+            for i in range(line_num):
+                station_num.append(len(train_route[i]['Stations']))
+
+            tag = ""
+            for i in range(line_num):
+                tag += "<optgroup label=" + train_route[i]['Name'] + ">"
+
+                for j in range(station_num[i]):
+                    current_station = train_route[i]['Stations'][j]
+                    current_station_with_line = current_station + "-" + train_route[i]['Name']
+                    tag += "<option value=" + current_station_with_line + ">" + current_station + "</option>"
+                tag += "</optgroup>"
+        return tag
+
+    def post(self):
+        utils = Utils()
+        url = "http://fantasy-transit.appspot.com/net?format=json"
+        station, route = self.read_route(url)
+
+        self.response.headers['Content-Type'] = 'text/html; charset=UTF-8'
+        
+        self.response.write(
+            """
+            <form action="train_transit" method="post">
+            <select name="start">
+            """
+            +
+            self.train_option(url)
+            +
+            """
+            </select>
+            <br>
+            <select name="end">
+            """
+            +
+            self.train_option(url)
+            +
+            """
+            </select>
+            <br>
+            <input type=submit value="Search">
+            </form>
+            """
+        )
+        
+        start = self.request.get('start')
+        end = self.request.get('end')
+        if utils.check_input(start, end):
+            self.response.write(start + " => " + end)
+            self.response.write("<br>")
+            self.response.write("<br>")
+            find_route = FindRoute()
+            path = find_route.search(station, route, start, end)
+            for i in range(len(path)):
+                self.response.write(path[i])
+                self.response.write("<br>")
+        
+        self.response.write(utils.back_to_menu())
 
 app = webapp2.WSGIApplication([
     ('/', MainPage),
     ('/shuffle_words', ShuffleWords),
+    ('/train_transit', TrainTransit)
 ], debug=True)
