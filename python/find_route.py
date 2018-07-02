@@ -10,19 +10,16 @@ class FindRoute():
     def enqueue(self, x, a):
         x[len(x):] = [a]
 
-    def search(self, adjacent, start, goal):    
+    def search(self, station, adjacent, start, goal):
         q = [[start]]
         while len(q) > 0:
             path = self.dequeue(q)
             last_component = path[len(path) - 1]
-            string = last_component.split("-")
-            if string[0] in goal:
+            if last_component == goal:
                 return path
             else:
-                for i in range(len(adjacent)):
-                    if adjacent[i][0] == last_component:
-                        break
-
-                for x in range(1, len(adjacent[i])):
-                    new_path = path[:] + [adjacent[i][x]]
-                    self.enqueue(q, new_path)
+                pos = station[last_component]
+                for x in range(1, len(adjacent[pos])):
+                    if not (adjacent[pos][x] in path):
+                        new_path = path[:] + [adjacent[pos][x]]
+                        self.enqueue(q, new_path)
