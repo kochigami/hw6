@@ -74,8 +74,8 @@ class ShuffleWords(webapp2.RequestHandler):
 
 class TrainTransit(webapp2.RequestHandler):
     def read_route(self, url):
-        route_upward = []
-        route_downward = []
+        route = []
+        station = {}
         response = urlfetch.fetch(url)
         if response.status_code == 200:
             train_route = json.loads(response.content)
@@ -89,26 +89,34 @@ class TrainTransit(webapp2.RequestHandler):
                     current_station = train_route[i]['Stations'][j] + "-" + train_route[i]['Name']
                     prev_station = None
                     next_station = None
-                    route_upward.append([current_station])
-                    route_downward.append([current_station])
-                    up_current_pos = len(route_upward) - 1
-                    down_current_pos = len(route_downward) - 1
+                    route.append([current_station])
+                    current_pos = len(route) - 1
+                    station[current_station] = current_pos
                     if j > 0:
                         prev_station = train_route[i]['Stations'][j-1] + "-" + train_route[i]['Name']
-                        route_downward[down_current_pos].append(prev_station)
+                        route[current_pos].append(prev_station)
                     if j < station_num[i] -1:
                         next_station = train_route[i]['Stations'][j+1] + "-" + train_route[i]['Name']
-                        route_upward[up_current_pos].append(next_station)
+                        route[current_pos].append(next_station)
 
-            for i in range(len(route_upward)):
-                for j in range(len(route_upward)):
-                    str1 = route_upward[i][0].split("-")
-                    str2 = route_upward[j][0].split("-")
-                    if i != j and str1[0] == str2[0]:
-                        route_upward[i].append(route_upward[j][0])
-                        route_downward[i].append(route_upward[j][0])
-                        
-        return route_upward, route_downward
+            for i in range(len(route)):
+                for j in range(len(route)):
+                    str1 = route[i][0].split("-")
+                    str2 = route[j][0].split("-")
+                    if  str1[0] == str2[0] and route[i][0] != route[j][0]:
+                        route[i].append(route[j][0])
+            ###
+            # for i in range(len(route)):
+            #     self.response.write("---" + route[i][0] + "---")
+            #     self.response.write("<br>")
+            #     self.response.write("<br>")
+
+            #     for j in range(1,len(route[i])):
+            #         print self.response.write(route[i][j])
+            #         self.response.write("<br>")
+            #     self.response.write("<br>")
+
+        return station, route
     
     def train_option(self, url):
         response = urlfetch.fetch(url)
@@ -133,7 +141,7 @@ class TrainTransit(webapp2.RequestHandler):
     def post(self):
         utils = Utils()
         url = "http://fantasy-transit.appspot.com/net?format=json"
-        route_upward, route_downward = self.read_route(url)
+        station, route = self.read_route(url)
 
         self.response.headers['Content-Type'] = 'text/html; charset=UTF-8'
         
@@ -167,9 +175,8 @@ class TrainTransit(webapp2.RequestHandler):
             self.response.write(start + " => " + end)
             self.response.write("<br>")
             self.response.write("<br>")
-            # FIXME upward or downward
             find_route = FindRoute()
-            path = find_route.search(route_upward, start, end)
+            path = find_route.search(station, route, start, end)
             for i in range(len(path)):
                 self.response.write(path[i])
                 self.response.write("<br>")
