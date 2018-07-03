@@ -105,17 +105,6 @@ class TrainTransit(webapp2.RequestHandler):
                     str2 = route[j][0].split("-")
                     if  str1[0] == str2[0] and route[i][0] != route[j][0]:
                         route[i].append(route[j][0])
-            ###
-            # for i in range(len(route)):
-            #     self.response.write("---" + route[i][0] + "---")
-            #     self.response.write("<br>")
-            #     self.response.write("<br>")
-
-            #     for j in range(1,len(route[i])):
-            #         print self.response.write(route[i][j])
-            #         self.response.write("<br>")
-            #     self.response.write("<br>")
-
         return station, route
     
     def train_option(self, url):
@@ -177,6 +166,18 @@ class TrainTransit(webapp2.RequestHandler):
             self.response.write("<br>")
             find_route = FindRoute()
             path = find_route.search(station, route, start, end)
+
+            # url = "http://fantasy-transit.appspot.com/trains?format=json"
+            # time = self.read_time(url)
+
+            # # choose path
+            # if mode == "fastest":
+            #     path = self.choose_fastest(path, time)
+            # # "least_transfers": #
+            # else:
+            #     path = self.choose_least_transfers(path)
+
+            # path_with_time = find_route.apply_time(path, time)
             for i in range(len(path)):
                 self.response.write(path[i])
                 self.response.write("<br>")
