@@ -3,7 +3,7 @@
 
 import webapp2
 from google.appengine.api import urlfetch
-import json, codecs
+import json
 from find_route import FindRoute
 
 class MainPage(webapp2.RequestHandler):
@@ -107,6 +107,9 @@ class TrainTransit(webapp2.RequestHandler):
                         route[i].append(route[j][0])
         return station, route
     
+    def read_time(self, url):
+        pass
+
     def train_option(self, url):
         response = urlfetch.fetch(url)
         if response.status_code == 200:
@@ -126,6 +129,41 @@ class TrainTransit(webapp2.RequestHandler):
                     tag += "<option value=" + current_station_with_line + ">" + current_station + "</option>"
                 tag += "</optgroup>"
         return tag
+
+    def show_path(self, path):
+        self.response.write(path[0].split("-")[0])
+        self.response.write(" (" + path[0].split("-")[1] + ") ")
+        self.response.write("<br>")
+        self.response.write("↓ ")
+        self.response.write("<br>")
+
+        current_line = path[0].split("-")[1]
+        for i in range(1, len(path)-1):
+            station = path[i].split("-")[0]
+            line = path[i].split("-")[1]
+            if current_line != line:
+                current_line = line
+                self.response.write(path[i-1].split("-")[0])
+                self.response.write(" (" + path[i-1].split("-")[1] + ") ")
+                self.response.write("<br>")
+                self.response.write("↓ ")
+                self.response.write("<br>")
+                self.response.write(path[i].split("-")[0])
+                self.response.write(" (" + path[i].split("-")[1] + ") ")
+                self.response.write("<br>")
+                self.response.write("↓ ")
+                self.response.write("<br>")
+
+        line = path[len(path)-1].split("-")[1]
+        if current_line != line and len(path) > 1:
+            self.response.write(path[len(path)-2].split("-")[0])
+            self.response.write(" (" + path[len(path)-2].split("-")[1] + ")")
+            self.response.write("<br>")
+            self.response.write("↓ ")
+            self.response.write("<br>")
+        self.response.write(path[len(path)-1].split("-")[0])
+        self.response.write(" (" + path[len(path)-1].split("-")[1] + ")")
+        self.response.write("<br>")
 
     def post(self):
         utils = Utils()
@@ -162,25 +200,33 @@ class TrainTransit(webapp2.RequestHandler):
         end = self.request.get('end')
         if utils.check_input(start, end):
             self.response.write(start + " => " + end)
-            self.response.write("<br>")
-            self.response.write("<br>")
+            self.response.write("<br> <br>")
             find_route = FindRoute()
             path = find_route.search(station, route, start, end)
 
             # url = "http://fantasy-transit.appspot.com/trains?format=json"
-            # time = self.read_time(url)
+            # url2 = "http://fantasy-transit.appspot.com/schedules?format=json"
+            # response = urlfetch.fetch(url)
+            # response2 = urlfetch.fetch(url2)
+            # if response.status_code == 200:
+            #     train_time = json.loads(response.content)
+            #     self.response.write(train_time[0]["Stops"][0]) # Station, Arrives, Departs 
+            #     self.response.write("<br>")
+            #     self.response.write(train_time[0]["Stops"][0]["Station"]) # 品川
+            #     self.response.write("<br>")
+            #     self.response.write(train_time[0]["Stops"][0]["Arrives"])
+            #     self.response.write("<br>")
+                #time = self.read_time(url)
 
             # # choose path
             # if mode == "fastest":
             #     path = self.choose_fastest(path, time)
             # # "least_transfers": #
             # else:
-            #     path = self.choose_least_transfers(path)
+            path = find_route.choose_least_transfers(path)
 
             # path_with_time = find_route.apply_time(path, time)
-            for i in range(len(path)):
-                self.response.write(path[i])
-                self.response.write("<br>")
+            self.show_path(path)
         
         self.response.write(utils.back_to_menu())
 

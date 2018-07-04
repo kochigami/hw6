@@ -26,3 +26,18 @@ class FindRoute():
                         new_path = path[:] + [adjacent[pos][x]]
                         self.enqueue(q, new_path)
         return path_list #
+
+    def choose_least_transfers(self, path):
+        min_transit = 100
+        for i in range(len(path)):
+            transit = 0
+            line = ""
+            for j in path[i]:
+                current_line = (j.split("-"))[1]
+                if line != current_line:
+                    line = current_line
+                    transit += 1
+            if min_transit > transit:
+                min_transit = transit
+                min_transit_path = path[i]
+        return min_transit_path

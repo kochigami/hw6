@@ -44,10 +44,14 @@ for i in range(len(route)):
 
 find_route = FindRoute()
 #start = u"品川-山手線"
-start = u"秋葉原-日比谷線"
-end = u"千鳥町-池上線"
+#start = u"秋葉原-日比谷線"
+#end = u"千鳥町-池上線"
+
+start=u"品川-山手線"
+end=u"目黒-目黒線"
 #end = u"五反田-山手線"
 print(start + " => " + end)
 path = find_route.search(station, route, start, end)
+path = find_route.choose_least_transfers(path)
 for i in range(len(path)):
     print(path[i])
