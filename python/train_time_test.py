@@ -18,6 +18,25 @@ yamanote_down = []
 print train_time[0]["LineId"]["Line"]["Name"]
 
 
+hour = 13
+minute = 55
+start="品川-山手線"
+path=["品川-山手線", "大崎-山手線", "五反田-山手線"]
+
+# start駅が分かる
+# 山手線の時刻表からweightを計算 time(hour, minute)も変数として持っておく
+# のぼり，くだり両方
+# 他の路線の乗り換え駅は，山手線の駅より遅い時間でセット
+# でもこれ大変だ．．．
+
+import networkx as nx
+graph = nx.DiGraph()
+#graph.add_node('s')
+#graph.add_node('a')
+#graph.add_edge('s', 'a', weight=2)
+#print nx.dijkstra_path(graph, 's', 't')
+
+
 # start, end, line
 # time 
 # start -> end の順番 (事前に計算できるといいのかな) 1
