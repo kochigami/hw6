@@ -5,6 +5,7 @@ import webapp2
 from google.appengine.api import urlfetch
 import json
 from find_route import FindRoute
+import datetime
 
 class MainPage(webapp2.RequestHandler):
     def get(self):
@@ -107,9 +108,6 @@ class TrainTransit(webapp2.RequestHandler):
                         route[i].append(route[j][0])
         return station, route
     
-    def read_time(self, url):
-        pass
-
     def train_option(self, url):
         response = urlfetch.fetch(url)
         if response.status_code == 200:
@@ -191,18 +189,53 @@ class TrainTransit(webapp2.RequestHandler):
             """
             </select>
             <br>
+            <select name="option">
+            <option value=fastest>
+            """
+            + u"時間優先"
+            """
+            </option>
+            <option value=least_transfers>
+            """
+            +
+            u"乗り換え回数優先"
+            +
+            """
+            </option>
+            </select>
             <input type=submit value="Search">
             </form>
             """
-        )
-        
+        )        
         start = self.request.get('start')
         end = self.request.get('end')
+        option = self.request.get('option')
+
         if utils.check_input(start, end):
             self.response.write(start + " => " + end)
             self.response.write("<br> <br>")
+
+            # if option == "least_transfers":
+            
             find_route = FindRoute()
-            path = find_route.search(station, route, start, end)
+            path = find_route.least_transfers(station, route, start, end)
+
+
+            # if option == "fastest":
+
+            # fetch current time
+            today = datetime.datetime.now()
+            # need to add 9 beacuse result is -9 (I don't know why)
+            hour = today.hour + 9
+            minute = today.minute
+            #second = today.second
+
+            # make a graph with timetable
+            # graph = train_time.make_graph(start, path, today)
+
+            # find path with Dijkstra's algorithm
+            # path = find_route.choose_fastest(station, route, start, end)
+
 
             # url = "http://fantasy-transit.appspot.com/trains?format=json"
             # url2 = "http://fantasy-transit.appspot.com/schedules?format=json"
@@ -216,16 +249,8 @@ class TrainTransit(webapp2.RequestHandler):
             #     self.response.write("<br>")
             #     self.response.write(train_time[0]["Stops"][0]["Arrives"])
             #     self.response.write("<br>")
-                #time = self.read_time(url)
 
-            # # choose path
-            # if mode == "fastest":
-            #     path = self.choose_fastest(path, time)
-            # # "least_transfers": #
-            # else:
-            path = find_route.choose_least_transfers(path)
 
-            # path_with_time = find_route.apply_time(path, time)
             self.show_path(path)
         
         self.response.write(utils.back_to_menu())

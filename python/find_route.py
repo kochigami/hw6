@@ -10,34 +10,16 @@ class FindRoute():
     def enqueue(self, x, a):
         x[len(x):] = [a]
 
-    def search(self, station, adjacent, start, goal):
+    def least_transfers(self, station, adjacent, start, goal):
         q = [[start]]
-        path_list = [] #
         while len(q) > 0:
             path = self.dequeue(q)
             last_component = path[len(path) - 1]
             if last_component == goal:
-                path_list.append(path) #
-                #return path
+                return path
             else:
                 pos = station[last_component]
                 for x in range(1, len(adjacent[pos])):
                     if not (adjacent[pos][x] in path):
                         new_path = path[:] + [adjacent[pos][x]]
                         self.enqueue(q, new_path)
-        return path_list #
-
-    def choose_least_transfers(self, path):
-        min_transit = 100
-        for i in range(len(path)):
-            transit = 0
-            line = ""
-            for j in path[i]:
-                current_line = (j.split("-"))[1]
-                if line != current_line:
-                    line = current_line
-                    transit += 1
-            if min_transit > transit:
-                min_transit = transit
-                min_transit_path = path[i]
-        return min_transit_path
