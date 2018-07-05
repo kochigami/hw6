@@ -49,7 +49,7 @@ class MakeGraph():
         # make_graph_of_same_line
         Graph, node_dict = self.make_graph_of_same_line(train_time, transfer_list)
         # make_graph_of_transfer_station
-        #Graph = self.make_graph_of_transfer_stations(Graph, node_dict, train_route)
+        Graph = self.make_graph_of_transfer_stations(Graph, transfer_dict, node_dict)
         return Graph, node_dict
 
     def make_graph_of_same_line(self, train_time, transfer_list):
@@ -142,24 +142,31 @@ class MakeGraph():
         end_min = end[0] * 60 + end[1]
         return end_min - start_min
 
-    def make_graph_of_transfer_stations(self, Graph, node_dict, train_route):
-        ts, transfer_list = self.add_transfer_station(train_route)    
-        nodes = Graph.nodes()
-        # nodes[i] : arrive
-        # j: depart
-        for i in range(len(nodes)):
-            target_station = self.fetch_station_name(nodes[i])
-            if target_station in ts:
-                stations = transfer_list[target_station]
-                for j in stations:
-                    train_list = node_dict[j]
-                    for k in train_list:
-                        arrive_time = self.fetch_time(nodes[i])
-                        depart_time = self.fetch_time(k)
-                        weight = self.compare_time(arrive_time, depart_time)
-                        if weight > 0:
-                            Graph.add_edge(nodes[i], k, weight = weight)
-
+    def make_graph_of_transfer_stations(self, Graph, transfer_dict, node_dict):
+        for i in node_dict.keys():
+            node_name = i.split("-")
+            node_name1 = node_name[0] + "-" + node_name[1] # station-line
+            node_name2 = node_name[2] # depart or arrive
+            if node_name2 == "arrive":
+                transfer_stations = transfer_dict[node_name1]
+                node_list_p = node_dict[i]
+                for j in transfer_stations:
+                    j_new = j + "-" + "depart"
+                    node_list_c = node_dict[j_new]
+                    for k in node_list_p:
+                        min_weight = 100
+                        for l in node_list_c:
+                            depart = self.fetch_time(l)
+                            arrive = self.fetch_time(k)
+                            # depart - arrive (arrive => depart)
+                            weight = self.compare_time(arrive, depart)
+                            if min_weight > weight:
+                                min_weight = weight
+                                tmp_k = k
+                                tmp_l = l
+                                Graph.add_edge(tmp_k, tmp_l, weight = weight )
+                            #if weight > 0:
+                            #    Graph.add_edge(k, l, weight = weight )
         return Graph
 
     def fetch_line(self, name, node_dict, mode, time):
@@ -169,7 +176,7 @@ class MakeGraph():
         for i in train_candidates:
             # 品川+山手線+-1+4+14+depart
             word = i.split('+')
-            if word[2] == '-1' and mode == word[5]:
+            if mode == word[5]:
                 hour = time[0]
                 minute = time[1]
                 if (hour < int(word[3]) or hour == int(word[3])) and (minute < int(word[4]) or minute == int(word[4])):
@@ -179,18 +186,6 @@ class MakeGraph():
                     elif mode == "arrive":
                         answer_list.append(i)
 
-        for i in train_candidates:
-            # 品川+山手線+-1+4+14+depart
-            word = i.split('+')
-            if word[2] == '1' and mode == word[5]:
-                hour = time[0]
-                minute = time[1]
-                if (hour < int(word[3]) or hour == int(word[3])) and (minute < int(word[4]) or minute == int(word[4])):
-                    if mode == "depart":
-                        answer_list.append(i)
-                        break
-                    elif mode == "arrive":
-                        answer_list.append(i)
         return answer_list
 
     def what_time_now(self):
@@ -207,22 +202,25 @@ def make_graph_test(train_data, train_route):
     graph, node_dict = make_graph.make_graph(train_data, train_route)
     print "end"
 
+    #    for i in graph.edges():
+    #    print i[0], i[1]
+
     start = u"品川-山手線-depart"
     start = u"渋谷-東横線-depart"
     #end = u"中目黒-日比谷線"
     end = u"品川-山手線-arrive"
-    end = u"渋谷-東横線-arrive"
+    end = u"自由が丘-大井町線-arrive"
+    #end = u"渋谷-東横線-arrive"
 
     time = make_graph.what_time_now()
-    print time
     start_st = make_graph.fetch_line(start, node_dict, "depart", time=time)
     end_st = make_graph.fetch_line(end, node_dict, "arrive", time=time)
     
-    for i in start_st:
-        print i
+    # for i in start_st:
+    #     print i
 
-    for  i in end_st:
-        print i
+    # for  i in end_st:
+    #     print i
 
     #for i in node_dict[start]:
     #    print i
