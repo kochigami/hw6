@@ -138,6 +138,41 @@ class TrainTransit(webapp2.RequestHandler):
                 tag += "</optgroup>"
         return tag
 
+    def show_path(self, path):
+        self.response.write(path[0].split("-")[0])
+        self.response.write(" (" + path[0].split("-")[1] + ") ")
+        self.response.write("<br>")
+        self.response.write("↓ ")
+        self.response.write("<br>")
+
+        current_line = path[0].split("-")[1]
+        for i in range(1, len(path)-1):
+            station = path[i].split("-")[0]
+            line = path[i].split("-")[1]
+            if current_line != line:
+                current_line = line
+                self.response.write(path[i-1].split("-")[0])
+                self.response.write(" (" + path[i-1].split("-")[1] + ") ")
+                self.response.write("<br>")
+                self.response.write("↓ ")
+                self.response.write("<br>")
+                self.response.write(path[i].split("-")[0])
+                self.response.write(" (" + path[i].split("-")[1] + ") ")
+                self.response.write("<br>")
+                self.response.write("↓ ")
+                self.response.write("<br>")
+
+        line = path[len(path)-1].split("-")[1]
+        if current_line != line and len(path) > 1:
+            self.response.write(path[len(path)-2].split("-")[0])
+            self.response.write(" (" + path[len(path)-2].split("-")[1] + ")")
+            self.response.write("<br>")
+            self.response.write("↓ ")
+            self.response.write("<br>")
+        self.response.write(path[len(path)-1].split("-")[0])
+        self.response.write(" (" + path[len(path)-1].split("-")[1] + ")")
+        self.response.write("<br>")
+
     def post(self):
         utils = Utils()
         url = "http://fantasy-transit.appspot.com/net?format=json"
@@ -177,9 +212,7 @@ class TrainTransit(webapp2.RequestHandler):
             self.response.write("<br>")
             find_route = FindRoute()
             path = find_route.search(station, route, start, end)
-            for i in range(len(path)):
-                self.response.write(path[i])
-                self.response.write("<br>")
+            self.show_path(path)
         
         self.response.write(utils.back_to_menu())
 
