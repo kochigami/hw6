@@ -65,7 +65,6 @@ class MakeGraph():
             for j in range(len(train_time[i]["Stops"])):
                 # Station
                 station = train_time[i]["Stops"][j]["Station"]
-                #station_j_plus_1 = train_time[i]["Stops"][j+1]["Station"]
             
                 # Departs
                 depart = train_time[i]["Stops"][j]["Departs"]
@@ -81,15 +80,8 @@ class MakeGraph():
                 Graph.add_node(station_depart_node)
                 Graph.add_node(station_arrive_node)
 
-                if before_arrive_node is not None:
-                    # make edge with weight
-                    depart = self.fetch_time(station_depart_node)
-                    arrive = self.fetch_time(before_arrive_node)
-                    # depart - arrive (arrive => depart)
-                    weight = self.compare_time(arrive, depart)
-                    Graph.add_edge(before_arrive_node, station_depart_node, weight = weight )
-                
-                if before_arrive_node is not None:
+                weight = None
+                if before_depart_node is not None:
                     # make edge with weight
                     depart = self.fetch_time(before_depart_node)
                     arrive = self.fetch_time(station_arrive_node)
@@ -97,8 +89,10 @@ class MakeGraph():
                     weight = self.compare_time(depart, arrive)
                     Graph.add_edge(before_depart_node, station_arrive_node, weight = weight )
 
+                if i==1000 and weight is not None:
+                    print before_depart_node + " -> " + station_arrive_node + " " + str(weight)
+
                 before_depart_node = station_depart_node
-                before_arrive_node = station_arrive_node
 
                 # add node_dict
                 # ex. key: 品川-山手線-depart => [node_name1, node_name2, ...]
@@ -112,7 +106,10 @@ class MakeGraph():
 
             # reset
             before_depart_node = None
-            before_arrive_node = None
+        
+        # for i in Graph.edges():
+        #     if u"品川+山手線+-1" in i[0]:
+        #         print i[0], i[1]
 
         return Graph, node_dict
 
@@ -160,19 +157,22 @@ class MakeGraph():
                             arrive = self.fetch_time(k)
                             # depart - arrive (arrive => depart)
                             weight = self.compare_time(arrive, depart)
-                            if min_weight > weight:
-                                min_weight = weight
-                                tmp_k = k
-                                tmp_l = l
-                                Graph.add_edge(tmp_k, tmp_l, weight = weight )
-                            #if weight > 0:
-                            #    Graph.add_edge(k, l, weight = weight )
+                            # if min_weight > weight:
+                            #     min_weight = weight
+                            #     tmp_k = k
+                            #     tmp_l = l
+                            #     Graph.add_edge(tmp_k, tmp_l, weight = weight )
+                            if weight > 0 and weight < 30:
+                               Graph.add_edge(k, l, weight = weight )
+                               #print k + " -> " + l + " " + str(weight)
         return Graph
 
     def fetch_line(self, name, node_dict, mode, time):
         answer_list = []
         tmp = None
         train_candidates = node_dict[name]
+        flag1 = True
+        flag2 = True
         for i in train_candidates:
             # 品川+山手線+-1+4+14+depart
             word = i.split('+')
@@ -180,9 +180,15 @@ class MakeGraph():
                 hour = time[0]
                 minute = time[1]
                 if (hour < int(word[3]) or hour == int(word[3])) and (minute < int(word[4]) or minute == int(word[4])):
-                    if mode == "depart":
-                        answer_list.append(i)
-                        break
+                    if mode == "depart" and flag1:
+                        if word[2] == "1":
+                            answer_list.append(i)
+                            flag1 = False
+                    if mode == "depart" and flag2:
+                        if word[2] == "-1":
+                            answer_list.append(i)
+                            flag2 = False
+                        #break
                     elif mode == "arrive":
                         answer_list.append(i)
 
@@ -202,22 +208,27 @@ def make_graph_test(train_data, train_route):
     graph, node_dict = make_graph.make_graph(train_data, train_route)
     print "end"
 
-    #    for i in graph.edges():
-    #    print i[0], i[1]
+    # for i in graph.edges():
+    #     print i[0], i[1]
 
     start = u"品川-山手線-depart"
     start = u"渋谷-東横線-depart"
     #end = u"中目黒-日比谷線"
     end = u"品川-山手線-arrive"
     end = u"自由が丘-大井町線-arrive"
+    start_st = node_dict[start]
+    end_st = node_dict[end]
+
+
     #end = u"渋谷-東横線-arrive"
 
     time = make_graph.what_time_now()
-    start_st = make_graph.fetch_line(start, node_dict, "depart", time=time)
-    end_st = make_graph.fetch_line(end, node_dict, "arrive", time=time)
     
-    # for i in start_st:
-    #     print i
+    #start_st = make_graph.fetch_line(start, node_dict, "depart", time=time)
+    #end_st = make_graph.fetch_line(end, node_dict, "arrive", time=time)
+    
+    for i in start_st:
+        print i
 
     # for  i in end_st:
     #     print i
@@ -241,7 +252,7 @@ def make_graph_test(train_data, train_route):
                 for k in path:
                     print k
             except:
-                print "not found"
+                print " "
 
 # file reading #
 
