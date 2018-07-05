@@ -2,9 +2,10 @@
 # -*- coding: utf-8 -*-
 
 import webapp2
+import networkx
 from google.appengine.api import urlfetch
 import json
-from find_route import FindRoute
+from make_graph import MakeGraph
 import datetime
 
 class MainPage(webapp2.RequestHandler):
@@ -156,7 +157,7 @@ class TrainTransit(webapp2.RequestHandler):
     def post(self):
         utils = Utils()
         url = "http://fantasy-transit.appspot.com/net?format=json"
-        station, route = self.read_route(url)
+        #station, route = self.read_route(url)
 
         self.response.headers['Content-Type'] = 'text/html; charset=UTF-8'
         
@@ -205,18 +206,12 @@ class TrainTransit(webapp2.RequestHandler):
             self.response.write(start + " => " + end)
             self.response.write("<br> <br>")
 
-
             # make a graph with timetable
             # graph = train_time.make_graph(start, path, today)
-            
-
-            # if option == "least_transfers":
-            
-            find_route = FindRoute()
-            path = find_route.least_transfers(station, route, start, end)
-
-
-            # if option == "fastest":
+            make_graph = MakeGraph()
+            f = open("trains.json", 'r')
+            train_time = json.load(f) 
+            graph, node_dict = make_graph.make_graph(train_data)
 
             # fetch current time
             today = datetime.datetime.now()
@@ -224,27 +219,21 @@ class TrainTransit(webapp2.RequestHandler):
             hour = today.hour + 9
             minute = today.minute
             #second = today.second
+            
+            start_st = make_graph.fetch_line(start, node_dict, "depart", time=[hour, minute])
+            end_st = make_graph.fetch_line(end, node_dict, "arrive", time=None)
 
+            # if option == "least_transfers":            
+            path_candidate = [] 
 
-            # find path with Dijkstra's algorithm
-            # path = find_route.choose_fastest(station, route, start, end)
+            # for i in end_st:
+            # path_candidate.append(networkx.all_simple_paths(graph, source=start_st, target=i))
+            # choose least len path
 
-
-            # url = "http://fantasy-transit.appspot.com/trains?format=json"
-            # url2 = "http://fantasy-transit.appspot.com/schedules?format=json"
-            # response = urlfetch.fetch(url)
-            # response2 = urlfetch.fetch(url2)
-            # if response.status_code == 200:
-            #     train_time = json.loads(response.content)
-            #     self.response.write(train_time[0]["Stops"][0]) # Station, Arrives, Departs 
-            #     self.response.write("<br>")
-            #     self.response.write(train_time[0]["Stops"][0]["Station"]) # 品川
-            #     self.response.write("<br>")
-            #     self.response.write(train_time[0]["Stops"][0]["Arrives"])
-            #     self.response.write("<br>")
-
-
-            self.show_path(path)
+            # if option == "fastest":
+            for i in end_st:
+                path = networkx.dijkstra_path(graph, source=start_st[0], target=i)
+                self.show_path(path)
         
         self.response.write(utils.back_to_menu())
 

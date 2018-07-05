@@ -5,12 +5,6 @@ import json, codecs
 import networkx
 from find_route_test import FindRouteTest
 
-f = open("trains.json", 'r')
-train_time = json.load(f)
-
-f2 = open("net.json", 'r')
-train_route = json.load(f2)
-
 def print_test():
     train_num = len(train_time)
     print train_num
@@ -72,12 +66,21 @@ def split_time(time_str):
     time_str = time_str.split(":")
     hour = time_str[0].split("T")
     hour = hour[1]
+    if hour[0] == '0' and len(hour) > 1:
+        hour = hour[1]
     minute = time_str[1]
     return [hour, minute]
 
 def make_graph(train_time):
+    # make_graph_of_same_line
+    Graph, node_dict = make_graph_of_same_line(train_time)
+    Graph = make_graph_of_transfer_stations(Graph, node_dict)
+    return Graph, node_dict
+
+def make_graph_of_same_line(train_time):
     Graph=networkx.DiGraph()
     train_num = len(train_time)
+    node_dict = {}
     for i in range(train_num):
         # line
         line = train_time[i]["LineId"]["Line"]["Name"]
@@ -101,23 +104,24 @@ def make_graph(train_time):
             Graph.add_node(station_j_node)
             Graph.add_node(station_j_plus_1_node)
 
-            # weight
-            if int(station_j_plus_1_arrive[1]) < int(station_j_depart[1]):
-                weight = int(station_j_plus_1_arrive[1]) + 60 - int(station_j_depart[1])
+            # add node_dict
+            if station_j + "-" + line in node_dict.keys():
+                node_dict[station_j + "-" + line].append(station_j_node)
             else:
-                weight = int(station_j_plus_1_arrive[1]) - int(station_j_depart[1])
+                node_dict[station_j + "-" + line] = [station_j_node]
 
-            # edge j-j+1
+            if station_j_plus_1 + "-" + line in node_dict.keys():
+                node_dict[station_j_plus_1 + "-" + line].append(station_j_plus_1_node)
+            else:
+                node_dict[station_j_plus_1 + "-" + line] = [station_j_plus_1_node]
+
             # weight
+            depart = fetch_time(station_j_node)
+            arrive = fetch_time(station_j_plus_1_node)
+            weight = compare_time(depart, arrive)
             Graph.add_edge(station_j_node, station_j_plus_1_node, weight = weight )
 
-    #Graph.nodes()
-    #Graph.edges(data=True)
-    #path = networkx.dijkstra_path(Graph, u'品川+山手線+-1+04+14', u'田町+山手線+-1+04+19')
-    #for i in path:
-    #    print i
-
-    return Graph
+    return Graph, node_dict
 
 def add_transfer_station():
     find_route_test = FindRouteTest()
@@ -137,37 +141,64 @@ def add_transfer_station():
         tmp_list = []
     return ts, transfer_list
 
-def connect_transfer():
+def fetch_station_name(node_name):
+    word = node_name.split("+")
+    return word[0] + "-" + word[1]
+
+def fetch_time(node_name):
+    word = node_name.split("+")
+    if word[3][0] == '0' and len(word[3]) > 1:
+        hour = word[3][1]
+    else:
+        hour = word[3]
+    return [int(hour), int(word[4])]
+
+def compare_time(start, end):
+    start_min = start[0] * 60 + start[1]
+    end_min = end[0] * 60 + end[1]
+    return end_min - start_min
+
+def make_graph_of_transfer_stations(Graph, node_dict):
     ts, transfer_list = add_transfer_station()    
-    Graph = make_graph(train_time)
     nodes = Graph.nodes()
-    #print len(nodes)
-    #for i in nodes:
-    #    print i
-    
-    # FIXME
     # nodes[i] : arrive
     # j: depart
-    # for i in range(len(nodes)):
-    #     if nodes[i] in ts:
-    #         # nodes[i] => arrive time
-    #         stations = transfer_list[nodes[i]]
-    #         for j in stations:
-    #             #j => depart time
-    #             if j_depart_time < nodes[i]_arrive_time:
-    #                 weight
-    #                 add edge
+    for i in range(len(nodes)):
+        target_station = fetch_station_name(nodes[i])
+        if target_station in ts:
+            stations = transfer_list[target_station]
+            for j in stations:
+                train_list = node_dict[j]
+                for k in train_list:
+                    arrive_time = fetch_time(nodes[i])
+                    depart_time = fetch_time(k)
+                    weight = compare_time(arrive_time, depart_time)
+                    if weight > 0:
+                        Graph.add_edge(nodes[i], k, weight = weight)
+
+    return Graph
 
 
-ts, transfer_list = add_transfer_station()
-#print ts
-#for i in ts:
-#    print i
+def make_graph_test(train_data):
+    print "start"
+    graph, node_dict = make_graph(train_data)
+    print "end"
+    path = networkx.dijkstra_path(graph, u'品川+山手線+-1+4+14+depart', u'田町+山手線+-1+4+19+arrive')
+    #for i in path:
+    #    print i
+    for i in node_dict.keys():
+        print i
+        for j in node_dict[i]:
+            print j
 
-print transfer_list
 
-for i in transfer_list.keys():
-    for j in transfer_list[i]:
-        print i + ": " + j
-    print "\n"
+# file reading #
+
+f = open("trains.json", 'r')
+train_time = json.load(f)
+
+f2 = open("net.json", 'r')
+train_route = json.load(f2)
+
+make_graph_test(train_time)
 
