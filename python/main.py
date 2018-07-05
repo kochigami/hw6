@@ -76,7 +76,7 @@ class ShuffleWords(webapp2.RequestHandler):
 class TrainTransit(webapp2.RequestHandler):
     def read_route(self, url):
         route = []
-        station = {}
+        transfer_station = []
         response = urlfetch.fetch(url)
         if response.status_code == 200:
             train_route = json.loads(response.content)
@@ -88,25 +88,15 @@ class TrainTransit(webapp2.RequestHandler):
             for i in range(line_num):
                 for j in range(station_num[i]):
                     current_station = train_route[i]['Stations'][j] + "-" + train_route[i]['Name']
-                    prev_station = None
-                    next_station = None
-                    route.append([current_station])
-                    current_pos = len(route) - 1
-                    station[current_station] = current_pos
-                    if j > 0:
-                        prev_station = train_route[i]['Stations'][j-1] + "-" + train_route[i]['Name']
-                        route[current_pos].append(prev_station)
-                    if j < station_num[i] -1:
-                        next_station = train_route[i]['Stations'][j+1] + "-" + train_route[i]['Name']
-                        route[current_pos].append(next_station)
+                    route.append(current_station)
 
             for i in range(len(route)):
                 for j in range(len(route)):
-                    str1 = route[i][0].split("-")
-                    str2 = route[j][0].split("-")
-                    if  str1[0] == str2[0] and route[i][0] != route[j][0]:
-                        route[i].append(route[j][0])
-        return station, route
+                    str1 = route[i].split("-")
+                    str2 = route[j].split("-")
+                    if  str1[0] == str2[0] and route[i] != route[j] and not(route[i] in transfer_station):
+                        transfer_station.append(route[i])
+        return transfer_station
     
     def train_option(self, url):
         response = urlfetch.fetch(url)
@@ -215,6 +205,11 @@ class TrainTransit(webapp2.RequestHandler):
             self.response.write(start + " => " + end)
             self.response.write("<br> <br>")
 
+
+            # make a graph with timetable
+            # graph = train_time.make_graph(start, path, today)
+            
+
             # if option == "least_transfers":
             
             find_route = FindRoute()
@@ -230,8 +225,6 @@ class TrainTransit(webapp2.RequestHandler):
             minute = today.minute
             #second = today.second
 
-            # make a graph with timetable
-            # graph = train_time.make_graph(start, path, today)
 
             # find path with Dijkstra's algorithm
             # path = find_route.choose_fastest(station, route, start, end)
