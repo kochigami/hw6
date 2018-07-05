@@ -6,93 +6,32 @@ import networkx
 import datetime
 
 class MakeGraph():
-    def make_graph(self, train_time, train_route):
-        # make_graph_of_same_line
-        Graph, node_dict = self.make_graph_of_same_line(train_time)
-        # make_graph_of_transfer_station
-        Graph = self.make_graph_of_transfer_stations(Graph, node_dict, train_route)
-        return Graph, node_dict
-
-    def make_graph_of_same_line(self, train_time):
-        Graph = networkx.DiGraph()
-        train_num = len(train_time)
-        node_dict = {}
-        for i in range(train_num):
-            # line
-            line = train_time[i]["LineId"]["Line"]["Name"]
-            direction = train_time[i]["LineId"]["Direction"]
-            for j in range(len(train_time[i]["Stops"])-1):
-                # Station
-                station_j = train_time[i]["Stops"][j]["Station"]
-                station_j_plus_1 = train_time[i]["Stops"][j+1]["Station"]
-            
-                # Departs
-                depart = train_time[i]["Stops"][j]["Departs"]
-                station_j_depart = self.split_time(depart)
-                
-                # Arrives
-                arrive = train_time[i]["Stops"][j+1]["Arrives"]
-                station_j_plus_1_arrive = self.split_time(arrive)
-                
-                # make node name
-                station_j_node = station_j + "+" + line + "+" + str(direction) + "+" + str(station_j_depart[0]) + "+" + str(station_j_depart[1]) + "+" + "depart"
-                station_j_plus_1_node = station_j_plus_1 + "+" + line + "+" + str(direction) + "+" + str(station_j_plus_1_arrive[0]) + "+" + str(station_j_plus_1_arrive[1]) + "+" + "arrive"
-                Graph.add_node(station_j_node)
-                Graph.add_node(station_j_plus_1_node)
-
-                # make edge with weight
-                depart = self.fetch_time(station_j_node)
-                arrive = self.fetch_time(station_j_plus_1_node)
-                weight = self.compare_time(depart, arrive)
-                Graph.add_edge(station_j_node, station_j_plus_1_node, weight = weight )
-                
-                # add node_dict
-                # ex. key: 品川-山手線 => [node_name1, node_name2, ...]
-                if station_j + "-" + line in node_dict.keys():
-                    node_dict[station_j + "-" + line].append(station_j_node)
-                else:
-                    node_dict[station_j + "-" + line] = [station_j_node]
-
-                if station_j_plus_1 + "-" + line in node_dict.keys():
-                    node_dict[station_j_plus_1 + "-" + line].append(station_j_plus_1_node)
-                else:
-                    node_dict[station_j_plus_1 + "-" + line] = [station_j_plus_1_node]
-
-        return Graph, node_dict
-
-    def split_time(self, time_str):
-        time_str = time_str.split(":")
-        hour = time_str[0].split("T")
-        hour = hour[1]
-        if hour[0] == '0' and len(hour) > 1:
-            hour = hour[1]
-        minute = time_str[1]
-        return [hour, minute]
-
-    def transfer_station_list (self, train_route):
-        line_num = len(train_route)
+    # 乗り換え駅リスト
+    def make_transfer_station_list (self, train_net):
+        line_num = len(train_net)
         station_num = []
         route = []
-        transfer_station = []
+        transfer_station_list = []
         for i in range(line_num):
-            station_num.append(len(train_route[i]['Stations']))
+            station_num.append(len(train_net[i]['Stations']))
         
         for i in range(line_num):
             for j in range(station_num[i]):
-                current_station = train_route[i]['Stations'][j] + "-" + train_route[i]['Name']
+                current_station = train_net[i]['Stations'][j] + "-" + train_net[i]['Name']
                 route.append(current_station)
 
         for i in range(len(route)):
             for j in range(len(route)):
                 str1 = route[i].split("-")
                 str2 = route[j].split("-")
-                if  str1[0] == str2[0] and route[i] != route[j] and not(route[i] in transfer_station):
-                    transfer_station.append(route[i])
+                if  str1[0] == str2[0] and route[i] != route[j] and not(route[i] in transfer_station_list):
+                    transfer_station_list.append(route[i])
 
-        return transfer_station
+        return transfer_station_list
 
-    def add_transfer_station(self, train_route):
-        transfer_list = self.transfer_station_list(train_route)    
+    # 乗り換え駅 dict
+    def add_transfer_station(self, train_net):
+        transfer_list = self.make_transfer_station_list(train_net)    
         transfer_dict = {}
 
         for i in range(len(transfer_list)):
@@ -104,6 +43,87 @@ class MakeGraph():
             transfer_dict[transfer_list[i]] = tmp_list
             tmp_list = []
         return transfer_list, transfer_dict
+
+    def make_graph(self, train_time, train_route):
+        transfer_list, transfer_dict = self.add_transfer_station(train_route)
+        # make_graph_of_same_line
+        Graph, node_dict = self.make_graph_of_same_line(train_time, transfer_list)
+        # make_graph_of_transfer_station
+        #Graph = self.make_graph_of_transfer_stations(Graph, node_dict, train_route)
+        return Graph, node_dict
+
+    def make_graph_of_same_line(self, train_time, transfer_list):
+        Graph = networkx.DiGraph()
+        train_num = len(train_time)
+        node_dict = {}
+        before_arrive_node = None
+        before_depart_node = None
+        for i in range(train_num):
+            # line
+            line = train_time[i]["LineId"]["Line"]["Name"]
+            direction = train_time[i]["LineId"]["Direction"]
+            for j in range(len(train_time[i]["Stops"])):
+                # Station
+                station = train_time[i]["Stops"][j]["Station"]
+                #station_j_plus_1 = train_time[i]["Stops"][j+1]["Station"]
+            
+                # Departs
+                depart = train_time[i]["Stops"][j]["Departs"]
+                station_depart = self.split_time(depart)
+                
+                # Arrives
+                arrive = train_time[i]["Stops"][j]["Arrives"]
+                station_arrive = self.split_time(arrive)
+                
+                # make node name
+                station_depart_node = station + "+" + line + "+" + str(direction) + "+" + str(station_depart[0]) + "+" + str(station_depart[1]) + "+" + "depart"
+                station_arrive_node = station + "+" + line + "+" + str(direction) + "+" + str(station_arrive[0]) + "+" + str(station_arrive[1]) + "+" + "arrive"
+                Graph.add_node(station_depart_node)
+                Graph.add_node(station_arrive_node)
+
+                if before_arrive_node is not None:
+                    # make edge with weight
+                    depart = self.fetch_time(station_depart_node)
+                    arrive = self.fetch_time(before_arrive_node)
+                    # depart - arrive (arrive => depart)
+                    weight = self.compare_time(arrive, depart)
+                    Graph.add_edge(before_arrive_node, station_depart_node, weight = weight )
+                
+                if before_arrive_node is not None:
+                    # make edge with weight
+                    depart = self.fetch_time(before_depart_node)
+                    arrive = self.fetch_time(station_arrive_node)
+                    # arrive - depart (depart => arrive)
+                    weight = self.compare_time(depart, arrive)
+                    Graph.add_edge(before_depart_node, station_arrive_node, weight = weight )
+
+                before_depart_node = station_depart_node
+                before_arrive_node = station_arrive_node
+
+                # add node_dict
+                # ex. key: 品川-山手線-depart => [node_name1, node_name2, ...]
+                if station + "-" + line in transfer_list:
+                    if station + "-" + line + "-depart" in node_dict.keys():
+                        node_dict[station + "-" + line + "-depart"].append(station_depart_node)
+                        node_dict[station + "-" + line + "-arrive"].append(station_arrive_node)
+                    else:
+                        node_dict[station + "-" + line + "-depart"] = [station_depart_node]
+                        node_dict[station + "-" + line + "-arrive"] = [station_arrive_node]
+
+            # reset
+            before_depart_node = None
+            before_arrive_node = None
+
+        return Graph, node_dict
+
+    def split_time(self, time_str):
+        time_str = time_str.split(":")
+        hour = time_str[0].split("T")
+        hour = hour[1]
+        if hour[0] == '0' and len(hour) > 1:
+            hour = hour[1]
+        minute = time_str[1]
+        return [hour, minute]
 
     def fetch_station_name(self, node_name):
         word = node_name.split("+")
@@ -180,24 +200,29 @@ class MakeGraph():
         return [hour, minute]
 
 def make_graph_test(train_data, train_route):
+
     make_graph = MakeGraph()
+
     print "start"
     graph, node_dict = make_graph.make_graph(train_data, train_route)
     print "end"
-    
-    start = u"品川-山手線"
-    end = u"中目黒-日比谷線"
-    #end = u"品川-山手線"
+
+    start = u"品川-山手線-depart"
+    start = u"渋谷-東横線-depart"
+    #end = u"中目黒-日比谷線"
+    end = u"品川-山手線-arrive"
+    end = u"渋谷-東横線-arrive"
 
     time = make_graph.what_time_now()
+    print time
     start_st = make_graph.fetch_line(start, node_dict, "depart", time=time)
     end_st = make_graph.fetch_line(end, node_dict, "arrive", time=time)
     
-    # for i in start_st:
-    #     print i
+    for i in start_st:
+        print i
 
-    # for  i in end_st:
-    #     print i
+    for  i in end_st:
+        print i
 
     #for i in node_dict[start]:
     #    print i
@@ -205,9 +230,9 @@ def make_graph_test(train_data, train_route):
     #for i in node_dict[end]:
     #    print i
 
-    path = networkx.dijkstra_path(graph, u'品川+山手線+-1+15+04+depart', u'中目黒+日比谷線+-1+16+22+arrive')
+    #path = networkx.dijkstra_path(graph, u'品川+山手線+-1+15+04+depart', u'中目黒+日比谷線+-1+16+22+arrive')
     #path = networkx.dijkstra_path(graph, u'品川+山手線+-1+4+14+depart', u'田町+山手線+-1+4+19+arrive')
-    print path
+    #print path
 
     for i in start_st:
         for j in end_st:
