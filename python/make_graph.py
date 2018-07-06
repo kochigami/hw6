@@ -290,6 +290,8 @@ def test(train_data, train_route, option="fastest"):
 
     make_graph = MakeGraph()
 
+    transfer_list, transfer_dict = make_graph.add_transfer_station(train_route)
+
     # make graph (station with time)
     print "start making graph structure"
     graph, node_dict, all_node_dict = make_graph.make_graph(train_data, train_route)
@@ -319,9 +321,24 @@ def test(train_data, train_route, option="fastest"):
         print "You already reach the goal!"
 
     # if start and end are different, search path
+    # TODO: if application, display time & station_name & direction (they can be obtained from node name)
     else:
-        start_st = make_graph.fetch_line(start, all_node_dict, time=time)
-        end_st = make_graph.fetch_line(end, all_node_dict, time=time)
+        start_new = start.split("-")
+        start_new = start_new[0] + "-" + start_new[1]
+        # 乗り換え駅始点なら，違う路線から行った方が早いかもしれないので，違う路線・同じ駅の候補も追加していく
+        if start_new in transfer_dict.keys():
+            line_list = transfer_dict[start_new]
+            start_st = []
+            for i in line_list:
+                start_tmp = make_graph.fetch_line(i + "-depart", all_node_dict, time=time)
+                for j in start_tmp:
+                    start_st.append(j)
+            end_st = make_graph.fetch_line(end, all_node_dict, time=time)
+
+        # 乗り換え駅でなければ，そのまま始点と終点を計算
+        else:
+            start_st = make_graph.fetch_line(start, all_node_dict, time=time)
+            end_st = make_graph.fetch_line(end, all_node_dict, time=time)
     
         # 時間優先
         if option == "fastest":
@@ -331,7 +348,6 @@ def test(train_data, train_route, option="fastest"):
                 for j in end_st:
                     if networkx.has_path(graph, i, j):
                         weight = networkx.dijkstra_path_length(graph, i, j)
-                        print weight
                         if min_weight > weight:
                             path = networkx.dijkstra_path(graph, i, j)
                             min_weight = weight
