@@ -6,7 +6,7 @@ import networkx
 import datetime
 
 class MakeGraph():
-    # 乗り換え駅リスト
+    # 乗り換え駅リスト["五反田-山手線", "目黒-山手線", ..., "目黒-目黒線", "五反田-池上線", ...]
     def make_transfer_station_list (self, train_net):
         line_num = len(train_net)
         station_num = []
@@ -29,7 +29,7 @@ class MakeGraph():
 
         return transfer_station_list
 
-    # 乗り換え駅 dict
+    # 乗り換え駅 dict dict["五反田-山手線"] = ["五反田-池上線"], dict["五反田-池上線"] = ["五反田-山手線"], ... 
     def add_transfer_station(self, train_net):
         transfer_list = self.make_transfer_station_list(train_net)    
         transfer_dict = {}
@@ -44,6 +44,8 @@ class MakeGraph():
             tmp_list = []
         return transfer_list, transfer_dict
 
+    # 駅名，路線名が同じで時間が違うノードをつなぐ
+    # arrive（昔） => depart （新） の流れでつなぐ
     def connect_same_station(self, graph, all_node_dict):
         for i in all_node_dict.keys():
             node_name = i.split("-")
@@ -61,14 +63,14 @@ class MakeGraph():
                                 depart = self.fetch_time(l)
                                 # depart - arrive (arrive => depart)
                                 weight = self.compare_time(arrive, depart)
+                                # 30分未満の乗り換え時間になるものをつなぐ
                                 if weight > 0 and weight < 30:
-                                    #print k + " " + l + " " + str(weight)
                                     graph.add_edge(k, l, weight = weight )
 
         return graph
 
+    # make graph 全体の関数 (乗り換え駅リスト，乗り換え駅dict作成，同じ路線で辺をつなぐ，同じ駅で辺をつなぐ，乗り換え駅で辺をつなぐ)
     def make_graph(self, train_time, train_route):
-        # TODO: 品川駅の終点の扱い 
         transfer_list, transfer_dict = self.add_transfer_station(train_route)
         # make_graph_of_same_line
         Graph, node_dict, all_node_dict = self.make_graph_of_same_line(train_time, transfer_list)
@@ -78,6 +80,17 @@ class MakeGraph():
         Graph = self.make_graph_of_transfer_stations(Graph, transfer_dict, node_dict)
         return Graph, node_dict, all_node_dict
 
+    # 同じ路線で辺をつなぐ　例：品川-山手線　=> 田町-山手線
+    # arrive (古) => depart (新)　の順につなぐ
+    # trains.json の電車の番号ごとに駅をつなぐ
+
+    # all_node_dict 
+    # all_node_dict[品川-山手線-arrive] = [nodeA, nodeB, nodeC, ..., nodeZ]
+    # all_node_dict[品川-山手線-depart] = [nodeA', nodeB', nodeC', ..., nodeZ']
+
+    # node_dict
+    # 乗り換えリストに含まれる駅のみ辞書にしたもの
+    # node_dict["五反田-池上線"] = [nodeA, nodeB, ..., nodeZ]
     def make_graph_of_same_line(self, train_time, transfer_list):
         Graph = networkx.DiGraph()
         train_num = len(train_time)
@@ -139,12 +152,10 @@ class MakeGraph():
             # reset
             before_depart_node = None
         
-        # for i in Graph.edges():
-        #     if u"品川+山手線+-1" in i[0]:
-        #         print i[0], i[1]
-
         return Graph, node_dict, all_node_dict
 
+    # jsonファイルの文字列から時間と分をとりだす
+    # 03 => 3 のように，頭に0がついていたら取る
     def split_time(self, time_str):
         time_str = time_str.split(":")
         hour = time_str[0].split("T")
@@ -157,10 +168,13 @@ class MakeGraph():
             minute = time_str[1]
         return [hour, minute]
 
+    # node名から駅名-路線名を取り出す
     def fetch_station_name(self, node_name):
         word = node_name.split("+")
         return word[0] + "-" + word[1]
 
+    # node名から時間と分を取り出す
+    # 03 => 3 のように，頭に0がついていたら取る
     def fetch_time(self, node_name):
         word = node_name.split("+")
         if word[3][0] == '0' and len(word[3]) > 1:
@@ -173,11 +187,14 @@ class MakeGraph():
             minute = word[4]            
         return [int(hour), int(minute)]
 
+    # かかる時間を計算する
+    # weightとして加える
     def compare_time(self, start, end):
         start_min = start[0] * 60 + start[1]
         end_min = end[0] * 60 + end[1]
         return end_min - start_min
 
+    # 乗り換え駅の間をつなぐ
     def make_graph_of_transfer_stations(self, Graph, transfer_dict, node_dict):
         for i in node_dict.keys():
             node_name = i.split("-")
@@ -190,22 +207,19 @@ class MakeGraph():
                     j_new = j + "-" + "depart"
                     node_list_c = node_dict[j_new]
                     for k in node_list_p:
-                        min_weight = 100
                         for l in node_list_c:
                             depart = self.fetch_time(l)
                             arrive = self.fetch_time(k)
                             # depart - arrive (arrive => depart)
                             weight = self.compare_time(arrive, depart)
-                            # if min_weight > weight:
-                            #     min_weight = weight
-                            #     tmp_k = k
-                            #     tmp_l = l
-                            #     Graph.add_edge(tmp_k, tmp_l, weight = weight )
+                            # 30分未満の乗り換え時間になるものをつなぐ
                             if weight > 0 and weight < 30:
                                Graph.add_edge(k, l, weight = weight )
-                               #print k + " -> " + l + " " + str(weight)
         return Graph
 
+    # 現在の時間より遅い時間のノードのリストを返す
+    # 無駄が多いと思う
+    # 品川-山手線のみ，出発で終点の品川駅 (trains.jsonの山手線30番目に出てくる品川駅) を選ぶと進めなくなるので，省いている
     def fetch_line(self, name, node_dict, time):
         answer_list = []
         tmp = None
@@ -213,121 +227,150 @@ class MakeGraph():
         flag1 = True
         flag2 = True
         name = name.split("-")
+        hour = time[0]
+        minute = time[1]
+        current_time = datetime.datetime(2018, 1, 1, int(hour), int(minute))
         if name[2] == "depart":
-            for i in train_candidates:
-                # 品川+山手線+-1+4+14+depart
-                word = i.split('+')
-                if word[5] == "depart": # direction (depart/ arrive) is equal
-                    hour = time[0]
-                    minute = time[1]                    
-                    if (hour < int(word[3]) or hour == int(word[3])) and (minute < int(word[4]) or minute == int(word[4])):
-                        if word[2] == "1":
-                            answer_list.append(i)
-                            break
+            for i in range(len(train_candidates)):
+                # ex. train_candidates[i]: 品川+山手線+-1+4+14+depart
+                word = train_candidates[i].split('+')
+                if u"品川+山手線" in train_candidates[i]: 
+                    if i%2 == 0:
+                        if word[5] == "depart": # direction (depart/ arrive) is equal
+                            planned_time = datetime.datetime(2018, 1, 1, int(word[3]), int(word[4]))
+                            if current_time < planned_time:
+                                if word[2] == "1":
+                                    answer_list.append(train_candidates[i])
+                                    break
 
-            for i in train_candidates:
-                # 品川+山手線+-1+4+14+depart
-                word = i.split('+')
-                if word[5] == "depart": # direction (depart/ arrive) is equal
-                    hour = time[0]
-                    minute = time[1]                    
-                    if (hour < int(word[3]) or hour == int(word[3])) and (minute < int(word[4]) or minute == int(word[4])):
-                        if word[2] == "-1":
-                            answer_list.append(i)
-                            break
+                else:
+                    if word[5] == "depart": # direction (depart/ arrive) is equal
+                        planned_time = datetime.datetime(2018, 1, 1, int(word[3]), int(word[4]))
+                        if current_time < planned_time:
+                            if word[2] == "1":
+                                answer_list.append(train_candidates[i])
+                                break
+
+            for i in range(len(train_candidates)):
+                word = train_candidates[i].split('+')
+                if u"品川+山手線" in train_candidates[i]: 
+                    if i%2 == 0:
+                        if word[5] == "depart": # direction (depart/ arrive) is equal
+                            planned_time = datetime.datetime(2018, 1, 1, int(word[3]), int(word[4]))
+                            if current_time < planned_time:
+                                if word[2] == "-1":
+                                    answer_list.append(train_candidates[i])
+                                    break
+                else:
+                    if word[5] == "depart": # direction (depart/ arrive) is equal
+                        planned_time = datetime.datetime(2018, 1, 1, int(word[3]), int(word[4]))
+                        if current_time < planned_time:
+                            if word[2] == "-1":
+                                answer_list.append(train_candidates[i])
+                                break
         else:
-            for i in train_candidates:
-                # 品川+山手線+-1+4+14+depart
-                word = i.split('+')
+            for i in range(len(train_candidates)):
+                word = train_candidates[i].split('+')
                 if word[5] == "arrive": # direction (depart/ arrive) is equal
-                    hour = time[0]
-                    minute = time[1]                    
-                    if (hour < int(word[3]) or hour == int(word[3])) and (minute < int(word[4]) or minute == int(word[4])):
-                        answer_list.append(i)
+                    planned_time = datetime.datetime(2018, 1, 1, int(word[3]), int(word[4]))
+                    if current_time < planned_time:
+                        answer_list.append(train_candidates[i])
 
         return answer_list
 
+    # 現在の時間を返す
     def what_time_now(self):
         today = datetime.datetime.now()
         hour = today.hour
         minute = today.minute
         return [hour, minute]
 
-def make_graph_test(train_data, train_route):
+# 経路検索のテスト
+def test(train_data, train_route, option="fastest"):
 
     make_graph = MakeGraph()
 
-    print "start"
+    # make graph (station with time)
+    print "start making graph structure"
     graph, node_dict, all_node_dict = make_graph.make_graph(train_data, train_route)
-    print "end"
+    print "finish making graph structure"
 
-    # for i in graph.edges():
-    #     if u"品川+山手線+-1+5" in i[0]: 
-    #     #if i[0] == u"品川+山手線+-1+10+15+depart":
-    #         print i[0], i[1]
 
+    # set start and end
+    # TODO: if application, add information via pushed button to "-depart" or "-start"
     start = u"品川-山手線-depart"
+    start = u"大崎-山手線-depart"
     start = u"渋谷-東横線-depart"
 
-    end = u"品川-山手線-arrive"
     end = u"自由が丘-大井町線-arrive"
-    end = u"大崎-山手線-arrive"
     end = u"中目黒-日比谷線-arrive"
     end = u"目黒-目黒線-arrive"
+    end = u"大崎-山手線-arrive"
+    end = u"品川-山手線-arrive"
 
+
+    # get current time
     time = make_graph.what_time_now()
     
-    start_st = make_graph.fetch_line(start, all_node_dict, time=time)
-    end_st = make_graph.fetch_line(end, all_node_dict, time=time)
+    # check same station?
+    s = start.split("-")
+    e = end.split("-")
+    if s[0] == e[0]:
+        print "You already reach the goal!"
+
+    # if start and end are different, search path
+    else:
+        start_st = make_graph.fetch_line(start, all_node_dict, time=time)
+        end_st = make_graph.fetch_line(end, all_node_dict, time=time)
     
-    # for i in start_st:
-    #     print i
+        # 時間優先
+        if option == "fastest":
+            path = None
+            min_weight = 10000
+            for i in start_st:
+                for j in end_st:
+                    if networkx.has_path(graph, i, j):
+                        weight = networkx.dijkstra_path_length(graph, i, j)
+                        print weight
+                        if min_weight > weight:
+                            path = networkx.dijkstra_path(graph, i, j)
+                            min_weight = weight
+            if path is None:
+                print "not found"
+            else:
+                for i in path:
+                    print i
 
-    # print "\n"
+        else:
+            # 乗り換え回数優先
+            path_list = []
+            for i in start_st:
+                for j in end_st:
+                    if networkx.has_path(graph, i, j):
+                        path_list.append(networkx.dijkstra_path(graph, i, j))
 
-    # for  i in end_st:
-    #     print i
+            if len(path_list) == 0:
+                print "not found"
+            else:
+                min_transfer = 10000
+                path = None
+                for i in range(len(path_list)):
+                    count = 0
+                    current_line = ""
+                    for j in path_list[i]:
+                        word = j.split("+")
+                        if current_line != word[1]:
+                            count += 1
+                            current_line = word[1]
+                    if min_transfer > count:
+                        path = path_list[i]
+                        min_transfer = count
 
-    for i in start_st:
-        for j in end_st:
-            if networkx.has_path(graph, i, j):
-                path = networkx.dijkstra_path(graph, i, j)
-                break
-
-
-    for i in path:
-        print i
-            # try:
-            #     for path in networkx.dijkstra_path(graph, i, j):
-            #         print path
-            #     print "\n"
-            # except:
-            #     print "skip"
-
-    #for i in node_dict[start]:
-    #    print i
-
-    #for i in node_dict[end]:
-    #    print i
-
-    #path = networkx.dijkstra_path(graph, u'品川+山手線+-1+7+19+depart', u'田町+山手線+-1+7+44+arrive')
-    #for path in networkx.shortest_path(graph, u'品川+山手線+-1+4+14+depart', u'田町+山手線+-1+7+44+arrive'):
-    #for path in networkx.shortest_path(graph, u'品川+山手線+-1+4+14+depart', u'浜松町+山手線+-1+4+24+arrive'):
-    #for path in networkx.shortest_path(graph, u'品川+山手線+-1+5+1+depart', u'仲御徒町+日比谷線+-1+8+50+arrive'):
-    #for path in networkx.dijkstra_path(graph, u'品川+山手線+-1+5+1+depart', u'仲御徒町+日比谷線+-1+8+50+arrive'):
-    #path = networkx.dijkstra_path(graph, u'品川+山手線+-1+4+14+depart', u'田町+山手線+-1+4+19+arrive')
-    #    print path
-
-    # for i in start_st:
-    #     for j in end_st:
-    #         try:
-    #             print i + ", " + j
-    #             path = networkx.dijkstra_path(graph, i, j)
-
-    #             for k in path:
-    #                 print k
-    #         except:
-    #             print " "
+                if path is None:
+                    print "not found"
+                else:
+                    for i in path:
+                        print i
 
 # file reading #
 
@@ -337,5 +380,5 @@ train_time = json.load(f)
 f2 = open("net.json", 'r')
 train_route = json.load(f2)
 
-make_graph_test(train_time, train_route)
+test(train_time, train_route)
 
