@@ -4,6 +4,7 @@
 import json, codecs
 import networkx
 import datetime
+import time as tm
 
 class MakeGraph():
     # 乗り換え駅リスト["五反田-山手線", "目黒-山手線", ..., "目黒-目黒線", "五反田-池上線", ...]
@@ -294,9 +295,11 @@ def test(train_data, train_route, option="fastest"):
 
     # make graph (station with time)
     print "start making graph structure"
+    start_time = tm.time()
     graph, node_dict, all_node_dict = make_graph.make_graph(train_data, train_route)
     print "finish making graph structure"
-
+    elapsed_time = tm.time() - start_time
+    print "elapsed_time:{0}".format(elapsed_time) + "[sec]"
 
     # set start and end
     # TODO: if application, add information via pushed button to "-depart" or "-start"
@@ -387,6 +390,9 @@ def test(train_data, train_route, option="fastest"):
                 else:
                     for i in path:
                         print i
+
+    elapsed_time = tm.time() - start_time
+    print "elapsed_time:{0}".format(elapsed_time) + "[sec]"
 
 # file reading #
 
